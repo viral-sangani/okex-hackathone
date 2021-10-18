@@ -18,6 +18,9 @@ contract PredictionMarketContract {
         uint256 totalAmount;
         uint256 totalYesAmount;
         uint256 totalNoAmount;
+        bool wining;
+        mapping(address => WinningAmount) winingYesCount;
+        mapping(address => WinningAmount) winningNoCount;
     }
 
     struct AmountAdded {
@@ -91,6 +94,73 @@ contract PredictionMarketContract {
         question.totalNoAmount += msg.value;
         question.totalAmount += msg.value;
     }
+
+    event DeclareWinner(
+        uint256 id,
+        bool winner
+    );
+
+    event Exception(
+        address adrs,
+        string reason
+    );
+
+    struct WinningAmount {
+        address user;
+        uint256 amount;
+        uint256 timestamp;
+    }
+
+
+    function declareWinnerForQuestion(uint256 _questionId, bool winner) public payable {
+        Questions storage question = questions[_questionId];
+        question.wining = winner;
+
+        emit DeclareWinner(
+            question.id,
+            question.wining
+        );
+    }
+
+    function distributeWinningAmount(uint256 _questionId) public payable {
+        Questions storage question = questions[_questionId];
+        if (question.wining) {
+            uint256 winningRatio = question.totalYesAmount / question.totalAmount; //Check for floating type values Int currently
+            AmountAdded storage amountAdded = question.yesCount[msg.sender];
+
+            if (amountAdded == 0) {
+                emit Exception(
+                    adrs = msg.sender,
+                    reason = "No bet placed for user!"
+                );
+            }
+
+            WinningAmount storage winningAmount = question.winingYesCount[msg.sender];
+            winningAmount.user = msg.sender;
+            winningAmount.amount = amountAdded * winningRatio;
+            winningAmount.timestamp = block.timestamp;
+
+            question.yesCount[msg.sender] = 0;
+        } else {
+            uint256 winningRatio = question.totalNoAmount / question.totalAmount; //Check for floating type values Int currently
+            AmountAdded storage amountAdded = question.noCount[msg.sender];
+
+            if (amountAdded == 0) {
+                emit Exception(
+                    adrs = msg.sender,
+                    reason = "No bet placed for user!"
+                );
+            }
+
+            WinningAmount storage winningAmount = question.winningNoCount[msg.sender];
+            winningAmount.user = msg.sender;
+            winningAmount.amount = amountAdded * winningRatio;
+            winningAmount.timestamp = block.timestamp;
+
+            question.noCount[msg.sender] = 0;
+        }
+    }
+
 }
 
 // "Will Modi win?", "abcd"
